@@ -18,14 +18,17 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="VedicSage Retrieval API",
               description="Retrieve relevant Vedic verses based on semantic similarity")
 
+
 class RetrievalResult(BaseModel):
     verse: str
     source: str
     score: float
 
+
 class RetrievalResponse(BaseModel):
     query: str
     results: List[RetrievalResult]
+
 
 def find_file(base_path: str, filename: str) -> str:
     search_dirs = [
@@ -44,23 +47,21 @@ def find_file(base_path: str, filename: str) -> str:
             return file_path
     raise FileNotFoundError(f"File '{filename}' not found in common directories: {search_dirs}")
 
+
 class VedicRetriever:
     def __init__(self, index_path: str, metadata_path: str, model_name: str = "all-MiniLM-L6-v2"):
         try:
-            logger.info(f"Current working directory: {os.getcwd()}")
-            logger.info(f"Attempting to load FAISS index from {index_path}")
             if not Path(index_path).exists():
                 logger.warning(f"FAISS index not found at {index_path}, searching common directories...")
-                index_path = find_file(os.path.dirname(index_path), "verse_index.faiss")
+                index_path = find_file(os.path.dirname(index_path), "verse_embeddings.faiss")
             self.index = faiss.read_index(index_path)
             logger.info(f"Loaded FAISS index from {index_path}")
 
-            logger.info(f"Attempting to load metadata from {metadata_path}")
             if not Path(metadata_path).exists():
                 logger.warning(f"Metadata CSV not found at {metadata_path}, searching common directories...")
-                metadata_path = find_file(os.path.dirname(metadata_path), "verses_metadata.csv")
+                metadata_path = find_file(os.path.dirname(metadata_path), "verse_metadata.csv")
             self.df = pd.read_csv(metadata_path, encoding='utf-8')
-            required_columns = ['verse_id', 'text', 'source']
+            required_columns = ['id', 'book', 'chapter', 'verse', 'text_en']
             if not all(col in self.df.columns for col in required_columns):
                 logger.error(f"Metadata missing required columns: {required_columns}")
                 raise ValueError(f"Metadata missing required columns")
@@ -81,9 +82,10 @@ class VedicRetriever:
                 if idx < len(self.df):
                     verse = self.df.iloc[idx]
                     score = 1 / (1 + dist)
+                    source = f"{verse['book']} {verse['chapter']}.{verse['verse']}"
                     results.append({
-                        "verse": verse['text'],
-                        "source": verse['source'],
+                        "verse": verse['text_en'],
+                        "source": source,
                         "score": float(score)
                     })
                 else:
@@ -93,11 +95,13 @@ class VedicRetriever:
             logger.error(f"Error retrieving for query '{query}': {e}")
             raise
 
+
 retriever = VedicRetriever(
-    index_path="../output/verse_index.faiss",
-    metadata_path="../output/verses_metadata.csv",
+    index_path="../output/verse_embeddings.faiss",
+    metadata_path="../output/verse_metadata.csv",
     model_name="all-MiniLM-L6-v2"
 )
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -106,7 +110,9 @@ async def lifespan(app: FastAPI):
     yield
     logger.info("VedicSage Retrieval API shutting down")
 
+
 app.lifespan = lifespan
+
 
 @app.get("/retrieve", response_model=RetrievalResponse)
 async def retrieve_verses(query: str, k: int = 5):
@@ -122,6 +128,10 @@ async def retrieve_verses(query: str, k: int = 5):
         logger.error(f"API error for query '{query}': {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    import os
+
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
