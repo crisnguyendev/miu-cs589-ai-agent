@@ -179,7 +179,7 @@ This project is licensed under the MIT License. See the LICENSE file for details
 
 ## Acknowledgments
 
-- MIU CS589 AI Agent course for project inspiration.
+- MIU CS589-AI course for project inspiration.
 - Sacred-Texts.com for Upanishad texts.
 - SentenceTransformers and FAISS for NLP and search capabilities.
 
