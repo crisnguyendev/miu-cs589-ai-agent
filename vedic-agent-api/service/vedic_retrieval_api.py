@@ -113,6 +113,10 @@ async def lifespan(app: FastAPI):
 
 app.lifespan = lifespan
 
+# To test the API
+@app.get("/")
+async def root():
+    return {"message": "Vedic Retrieval API is running"}
 
 @app.get("/retrieve", response_model=RetrievalResponse)
 async def retrieve_verses(query: str, k: int = 5):
