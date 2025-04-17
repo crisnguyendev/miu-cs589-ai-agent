@@ -128,6 +128,10 @@ async def retrieve_verses(query: str, k: int = 5):
         logger.error(f"API error for query '{query}': {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
+# For testing API
+@app.get("/")
+async def root():
+    return {"message": "Vedic Retrieval API is running"}
 
 if __name__ == "__main__":
     import uvicorn
