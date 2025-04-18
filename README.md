@@ -1,28 +1,30 @@
 # VedicSage: Semantic Search for Upanishads
 
-*VedicSage* is an AI-powered semantic search application designed to process and query verses from the Upanishads, ancient Vedic texts. By parsing raw text files, generating semantic embeddings, and serving a FastAPI-based search API, the project enables users to explore philosophical and spiritual teachings through natural language queries (e.g., "What does the Upanishads say about the self?"). Developed as part of the MIU CS589 AI Agent course, the project aims to parse \~1,000 verses (currently \~30, targeting \~276 from current texts).
+*VedicSage* is an AI-powered semantic search application designed to process and query verses from the Upanishads, ancient Vedic texts. By parsing raw text files, generating semantic embeddings, and serving a FastAPI-based search API, the project enables users to explore philosophical and spiritual teachings through natural language queries (e.g., "What does the Upanishads say about the self?"). Developed as part of the MIU CS589 AI Agent course, the project currently parses ~276 verses from four texts and aims to scale to ~1,000 verses.
 
 ## Project Overview
 
-The project processes Upanishad texts (`upanishads-isa.txt`, `upanishads-kena.txt`, `upanishads-katha.txt`, `Upanishads-Translated-by-Swami-Paramananda-PLAINTEXT.txt`) to extract structured verses, converts them into embeddings using a SentenceTransformer model (`all-MiniLM-L6-v2`), and serves a FastAPI endpoint for semantic search. The pipeline is orchestrated by a Bash script (`run_vedicsage.sh`).
+The project processes Upanishad texts (`upanishads-isa.txt`, `upanishads-kena.txt`, `upanishads-katha.txt`, `Upanishads-Translated-by-Swami-Paramananda-PLAINTEXT.txt`) to extract structured verses, converts them into embeddings using a SentenceTransformer model (`all-MiniLM-L6-v2`), and serves a FastAPI endpoint for semantic search. The pipeline is orchestrated by Bash scripts (`generate_data.sh` for data generation, `run_api.sh` for the API).
 
 ### Features
 
 - **Text Parsing**: Extracts verses from Upanishad texts, handling complex formatting (e.g., Roman numerals, commentary).
 - **Semantic Embeddings**: Generates vector representations for verses using NLP techniques.
 - **FastAPI Server**: Provides a queryable API for retrieving relevant verses based on semantic similarity.
-- **Scalable Design**: Supports adding more Upanishad texts to reach \~1,000 verses.
+- **Scalable Design**: Supports adding more Upanishad texts to reach ~1,000 verses.
 
 ### Current Status
 
-- Parses \~30 verses from four texts (expected \~276: Isa \~19, Kena \~36, Katha \~120, Paramananda \~100 estimated).
-- Goal: Scale to \~1,000 verses by adding more texts (e.g., Svetasvatara, Prasna).
+- Parses ~276 verses from four texts (Isa ~19, Kena ~36, Katha ~120, Paramananda ~100).
+- Goal: Scale to ~1,000 verses by adding more texts (e.g., Svetasvatara, Prasna).
+- Fixed API initialization issue by aligning FAISS index file name (`verse_index.faiss`) across scripts.
 
 ## Project Structure
 
 ```plaintext
 miu-cs589-ai-agent-api/
-├── run_vedicsage.sh               # Bash script to run the pipeline
+├── generate_data.sh               # Bash script for data generation
+├── run_api.sh                     # Bash script to run the FastAPI server
 ├── data/
 │   ├── vedic_parse_verses.py      # Parses Upanishad texts into verses.csv
 │   ├── vedic_embed_verses.py      # Generates embeddings and FAISS index
@@ -32,11 +34,11 @@ miu-cs589-ai-agent-api/
 │   ├── upanishads-isa.txt         # Isa Upanishad (~19 verses)
 │   ├── upanishads-kena.txt        # Kena Upanishad (~36 verses)
 │   ├── upanishads-katha.txt       # Katha Upanishad (~120 verses)
-│   ├── Upanishads-Translated-by-Swami-Paramananda-PLAINTEXT.txt  # Collection (~100 verses estimated)
+│   ├── Upanishads-Translated-by-Swami-Paramananda-PLAINTEXT.txt  # Collection (~100 verses)
 ├── output/
 │   ├── verses.csv                 # Parsed verses
-│   ├── verse_embeddings.faiss      # FAISS index
-│   ├── verse_metadata.csv         # Metadata for verses
+│   ├── verse_index.faiss          # FAISS index
+│   ├── verses_metadata.csv        # Metadata for verses
 ├── .gitignore                     # Excludes .venv/, output/, cache files
 ├── README.md                      # This file
 ```
@@ -44,7 +46,7 @@ miu-cs589-ai-agent-api/
 ## Prerequisites
 
 - **Python 3.8+**
-- **Bash** (for running `run_vedicsage.sh`)
+- **Bash** (for running `generate_data.sh` and `run_api.sh`)
 - **Dependencies** (installed via `pip`):
   - `pandas`
   - `numpy`
@@ -82,10 +84,10 @@ miu-cs589-ai-agent-api/
    - `upanishads-katha.txt`
    - `Upanishads-Translated-by-Swami-Paramananda-PLAINTEXT.txt`
 
-5. **Make Script Executable**:
+5. **Make Scripts Executable**:
 
    ```bash
-   chmod +x run_vedicsage.sh
+   chmod +x generate_data.sh run_api.sh
    ```
 
 ## Running the Project
@@ -93,14 +95,19 @@ miu-cs589-ai-agent-api/
 Run the pipeline to parse texts, generate embeddings, and start the FastAPI server:
 
 ```bash
-./run_vedicsage.sh
+./run_api.sh
 ```
 
 The script will:
 
-- Parse Upanishad texts into `output/verses.csv`.
-- Generate embeddings and save to `output/verse_embeddings.faiss` and `output/verse_metadata.csv`.
+- Run `generate_data.sh` to parse Upanishad texts into `output/verses.csv`, generate embeddings, and save to `output/verse_index.faiss` and `output/verses_metadata.csv`.
 - Start the FastAPI server at `http://localhost:8000`.
+
+To only generate data without starting the API:
+
+```bash
+./generate_data.sh
+```
 
 ## Using the API
 
@@ -139,15 +146,17 @@ Access the API documentation at `http://localhost:8000/docs`.
 
 ## Adding More Upanishads
 
-To reach the \~1,000-verse goal (current: \~30, target: \~276):
+To reach the ~1,000-verse goal (current: ~276):
 
-1. Download additional Upanishad texts from Sacred-Texts.com:
+1. Download additional Upanishad texts from [Sacred-Texts.com](https://www.sacred-texts.com/hin/):
 
-   - Svetasvatara (\~100 verses)
-   - Prasna (\~60 verses)
-   - Taittiriya (\~50 verses)
-   - Mundaka (\~60 verses)
-   - Mandukya (\~12 verses)
+   - Svetasvatara (~100 verses)
+   - Prasna (~60 verses)
+   - Taittiriya (~50 verses)
+   - Mundaka (~60 verses)
+   - Mandukya (~12 verses)
+   - Brihadaranyaka (~200 verses)
+   - Chandogya (~300 verses)
 
 2. Example download:
 
@@ -155,7 +164,7 @@ To reach the \~1,000-verse goal (current: \~30, target: \~276):
    curl https://www.sacred-texts.com/hin/svet/svet.txt -o resources/upanishads-svetasvatara.txt
    ```
 
-3. Place files in `resources/` and rerun `run_vedicsage.sh`.
+3. Place files in `resources/` and rerun `run_api.sh` or `generate_data.sh`.
 
 ## Contributing
 
@@ -169,9 +178,9 @@ Contributions are welcome! To contribute:
 
 Please focus on:
 
-- Improving verse parsing to reach \~276+ verses.
-- Adding more Upanishad texts.
+- Adding more Upanishad texts to reach ~1,000 verses.
 - Enhancing API functionality or documentation.
+- Optimizing performance or error handling.
 
 ## License
 
@@ -179,10 +188,10 @@ This project is licensed under the MIT License. See the LICENSE file for details
 
 ## Acknowledgments
 
-- MIU CS589-AI course for project inspiration.
-- Sacred-Texts.com for Upanishad texts.
+- MIU CS589 AI Agent course for project inspiration.
+- [Sacred-Texts.com](https://www.sacred-texts.com/hin/) for Upanishad texts.
 - SentenceTransformers and FAISS for NLP and search capabilities.
 
 ---
 
-*Note*: The project is under development to increase the verse count from \~30 to \~276 and ultimately \~1,000. Contributions to improve parsing are highly encouraged!
+*Note*: The project has resolved API initialization issues and is parsing ~276 verses, with plans to scale to ~1,000. Contributions to add texts or improve the pipeline are highly encouraged!
