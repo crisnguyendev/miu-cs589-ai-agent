@@ -22,7 +22,7 @@ app = FastAPI(title="VedicSage Retrieval API",
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Allow your frontend origin
+    allow_origins=["http://localhost:5173"],  # Allow your frontend origin
     allow_credentials=True,
     allow_methods=["*"],  # Allow all methods (GET, POST, etc.)
     allow_headers=["*"],  # Allow all headers
