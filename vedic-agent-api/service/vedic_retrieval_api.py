@@ -53,13 +53,13 @@ class VedicRetriever:
         try:
             if not Path(index_path).exists():
                 logger.warning(f"FAISS index not found at {index_path}, searching common directories...")
-                index_path = find_file(os.path.dirname(index_path), "verse_embeddings.faiss")
+                index_path = find_file(os.path.dirname(index_path), "verse_index.faiss")
             self.index = faiss.read_index(index_path)
             logger.info(f"Loaded FAISS index from {index_path}")
 
             if not Path(metadata_path).exists():
                 logger.warning(f"Metadata CSV not found at {metadata_path}, searching common directories...")
-                metadata_path = find_file(os.path.dirname(metadata_path), "verse_metadata.csv")
+                metadata_path = find_file(os.path.dirname(metadata_path), "verses_metadata.csv")
             self.df = pd.read_csv(metadata_path, encoding='utf-8')
             # old column format
             # required_columns = ['id', 'book', 'chapter', 'verse', 'text_en']
@@ -138,6 +138,10 @@ async def root():
 if __name__ == "__main__":
     import uvicorn
     import os
+
+    logger.info(f"Working directory: {os.getcwd()}")
+
+
 
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
