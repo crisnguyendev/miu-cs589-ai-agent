@@ -53,15 +53,17 @@ class VedicRetriever:
         try:
             if not Path(index_path).exists():
                 logger.warning(f"FAISS index not found at {index_path}, searching common directories...")
-                index_path = find_file(os.path.dirname(index_path), "verse_embeddings.faiss")
+                index_path = find_file(os.path.dirname(index_path), "verse_index.faiss")
             self.index = faiss.read_index(index_path)
             logger.info(f"Loaded FAISS index from {index_path}")
 
             if not Path(metadata_path).exists():
                 logger.warning(f"Metadata CSV not found at {metadata_path}, searching common directories...")
-                metadata_path = find_file(os.path.dirname(metadata_path), "verse_metadata.csv")
+                metadata_path = find_file(os.path.dirname(metadata_path), "verses_metadata.csv")
             self.df = pd.read_csv(metadata_path, encoding='utf-8')
-            required_columns = ['id', 'book', 'chapter', 'verse', 'text_en']
+            # old column format
+            # required_columns = ['id', 'book', 'chapter', 'verse', 'text_en']
+            required_columns = ['verse_id', 'text', 'source']
             if not all(col in self.df.columns for col in required_columns):
                 logger.error(f"Metadata missing required columns: {required_columns}")
                 raise ValueError(f"Metadata missing required columns")
@@ -82,10 +84,17 @@ class VedicRetriever:
                 if idx < len(self.df):
                     verse = self.df.iloc[idx]
                     score = 1 / (1 + dist)
-                    source = f"{verse['book']} {verse['chapter']}.{verse['verse']}"
+                    # other format:
+                    # source = f"{verse['book']} {verse['chapter']}.{verse['verse']}"
+                    # results.append({
+                    #     "verse": verse['text_en'],
+                    #     "source": source,
+                    #     "score": float(score)
+                    # })
+
                     results.append({
-                        "verse": verse['text_en'],
-                        "source": source,
+                        "verse": verse["text"],
+                        "source": verse["source"],
                         "score": float(score)
                     })
                 else:
@@ -97,8 +106,8 @@ class VedicRetriever:
 
 
 retriever = VedicRetriever(
-    index_path="../output/verse_embeddings.faiss",
-    metadata_path="../output/verse_metadata.csv",
+    index_path="../output/verse_index.faiss",
+    metadata_path="../output/verses_metadata.csv",
     model_name="all-MiniLM-L6-v2"
 )
 
@@ -136,6 +145,10 @@ async def root():
 if __name__ == "__main__":
     import uvicorn
     import os
+
+    logger.info(f"Working directory: {os.getcwd()}")
+
+
 
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
