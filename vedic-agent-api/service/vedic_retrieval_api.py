@@ -10,15 +10,23 @@ import warnings
 from typing import List, Dict
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
+from fastapi.middleware.cors import CORSMiddleware
 
 warnings.filterwarnings("ignore", category=UserWarning, module="urllib3")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
+
 app = FastAPI(title="VedicSage Retrieval API",
               description="Retrieve relevant Vedic verses based on semantic similarity")
-
-
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # Allow your frontend origin
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all methods (GET, POST, etc.)
+    allow_headers=["*"],  # Allow all headers
+)
 class RetrievalResult(BaseModel):
     verse: str
     source: str
