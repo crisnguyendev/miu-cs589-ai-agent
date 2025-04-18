@@ -84,10 +84,17 @@ class VedicRetriever:
                 if idx < len(self.df):
                     verse = self.df.iloc[idx]
                     score = 1 / (1 + dist)
-                    source = f"{verse['book']} {verse['chapter']}.{verse['verse']}"
+                    # other format:
+                    # source = f"{verse['book']} {verse['chapter']}.{verse['verse']}"
+                    # results.append({
+                    #     "verse": verse['text_en'],
+                    #     "source": source,
+                    #     "score": float(score)
+                    # })
+
                     results.append({
-                        "verse": verse['text_en'],
-                        "source": source,
+                        "verse": verse["text"],
+                        "source": verse["source"],
                         "score": float(score)
                     })
                 else:

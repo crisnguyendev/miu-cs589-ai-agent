@@ -12,7 +12,12 @@ if not Path(csv_path).exists():
     exit(1)
 
 df = pd.read_csv(csv_path)
+# #why change of format here?
 required_columns = ["verse_id", "text", "source"]
+
+# old way:
+# required_columns = ['id', 'book', 'chapter', 'verse', 'text_en']
+
 if not all(col in df.columns for col in required_columns):
     print(f"Error: CSV missing required columns: {required_columns}")
     exit(1)
