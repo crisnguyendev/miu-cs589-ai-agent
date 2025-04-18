@@ -18,17 +18,6 @@ log() {
   echo -e "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
 }
 
-# Step 0: Run data generation
-log "Running data generation..."
-if [ ! -f "./generate_data.sh" ]; then
-  log "Error: generate_data.sh not found"
-  exit 1
-fi
-./generate_data.sh || {
-  log "Error: Data generation failed"
-  exit 1
-}
-
 # Step 1: Verify required files
 log "Verifying required files..."
 if [ ! -f "${OUTPUT_DIR}/verse_index.faiss" ]; then
