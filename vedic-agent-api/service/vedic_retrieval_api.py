@@ -61,7 +61,9 @@ class VedicRetriever:
                 logger.warning(f"Metadata CSV not found at {metadata_path}, searching common directories...")
                 metadata_path = find_file(os.path.dirname(metadata_path), "verse_metadata.csv")
             self.df = pd.read_csv(metadata_path, encoding='utf-8')
-            required_columns = ['id', 'book', 'chapter', 'verse', 'text_en']
+            # old column format
+            # required_columns = ['id', 'book', 'chapter', 'verse', 'text_en']
+            required_columns = ['verse_id', 'text', 'source']
             if not all(col in self.df.columns for col in required_columns):
                 logger.error(f"Metadata missing required columns: {required_columns}")
                 raise ValueError(f"Metadata missing required columns")
@@ -97,8 +99,8 @@ class VedicRetriever:
 
 
 retriever = VedicRetriever(
-    index_path="../output/verse_embeddings.faiss",
-    metadata_path="../output/verse_metadata.csv",
+    index_path="../output/verse_index.faiss",
+    metadata_path="../output/verses_metadata.csv",
     model_name="all-MiniLM-L6-v2"
 )
 
@@ -113,10 +115,6 @@ async def lifespan(app: FastAPI):
 
 app.lifespan = lifespan
 
-# To test the API
-@app.get("/")
-async def root():
-    return {"message": "Vedic Retrieval API is running"}
 
 @app.get("/retrieve", response_model=RetrievalResponse)
 async def retrieve_verses(query: str, k: int = 5):
