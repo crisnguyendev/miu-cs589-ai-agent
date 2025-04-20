@@ -17,8 +17,19 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="VedicSage Retrieval API",
               description="Retrieve relevant Vedic verses based on semantic similarity")
+<<<<<<< Updated upstream
 
 
+=======
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "https://miu-vedic-science.vercel.app"],  # Allow your frontend origin
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all methods (GET, POST, etc.)
+    allow_headers=["*"],  # Allow all headers
+)
+>>>>>>> Stashed changes
 class RetrievalResult(BaseModel):
     verse: str
     source: str
