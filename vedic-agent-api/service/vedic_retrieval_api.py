@@ -160,7 +160,7 @@ async def submit_feedback(feedback: FeedbackRequest):
             "timestamp": pd.Timestamp.now()
         }
         feedback_df = pd.DataFrame([feedback_data])
-        feedback_file = "../output/feedback.csv"
+        feedback_file = "./output/feedback.csv"
         if Path(feedback_file).exists():
             feedback_df.to_csv(feedback_file, mode='a', header=False, index=False)
         else:
