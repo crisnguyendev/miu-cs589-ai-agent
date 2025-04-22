@@ -1,12 +1,10 @@
 import logging
 import os
 import warnings
-import numpy as np
 import pandas as pd
 from pathlib import Path
 from sentence_transformers import SentenceTransformer
 import faiss
-from typing import List, Dict
 
 warnings.filterwarnings("ignore", category=UserWarning, module="urllib3")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
