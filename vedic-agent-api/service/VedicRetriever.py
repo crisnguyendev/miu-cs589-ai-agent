@@ -1,6 +1,8 @@
 import logging
 import os
 import warnings
+from typing import List, Dict
+import numpy as np
 import pandas as pd
 from pathlib import Path
 from sentence_transformers import SentenceTransformer
@@ -57,4 +59,26 @@ class VedicRetriever:
 
         except Exception as e:
             logger.error(f"Error initializing retriever: {e}")
+            raise
+
+    def retrieve(self, query: str, k: int = 5) -> List[Dict]:
+        try:
+            query_emb = self.model.encode([query]).astype(np.float32)
+            distances, indices = self.index.search(query_emb, k)
+            results = []
+            for dist, idx in zip(distances[0], indices[0]):
+                if idx < len(self.df):
+                    verse = self.df.iloc[idx]
+                    score = 1 / (1 + dist)
+
+                    results.append({
+                        "verse": verse["text"],
+                        "source": verse["source"],
+                        "score": float(score)
+                    })
+                else:
+                    logger.warning(f"Invalid index {idx} returned by FAISS")
+            return results
+        except Exception as e:
+            logger.error(f"Error retrieving for query '{query}': {e}")
             raise
