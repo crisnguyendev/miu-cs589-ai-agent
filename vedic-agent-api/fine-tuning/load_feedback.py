@@ -1,7 +1,7 @@
 import pandas as pd
 from pathlib import Path
 
-def load_feedback(feedback_path="../output/feedback.csv"):
+def load_feedback(feedback_path="./output/feedback.csv"):
     if not Path(feedback_path).exists():
         print("No feedback data found.")
         return None
