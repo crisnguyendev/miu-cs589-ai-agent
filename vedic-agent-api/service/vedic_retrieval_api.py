@@ -1,8 +1,5 @@
 from fastapi import FastAPI, HTTPException
-from sentence_transformers import SentenceTransformer
-import faiss
 import pandas as pd
-import numpy as np
 from pathlib import Path
 import logging
 import os
