@@ -25,5 +25,5 @@ def update_embeddings_and_index(model_path="../output/fine_tuned_model",
     print(f"Updated FAISS index saved to {output_index_path}")
 
 
-# Run update
-update_embeddings_and_index()
+    # Run update
+    update_embeddings_and_index()

@@ -1,8 +1,23 @@
 from sentence_transformers import SentenceTransformer, InputExample, losses
 from torch.utils.data import DataLoader
 import pandas as pd
-from load_feedback import load_feedback
 
+from pymongo import MongoClient  # Added for MongoDB
+from dotenv import load_dotenv
+import os
+
+from finetuning.loadFeedback import load_feedback
+
+# Load environment variables
+load_dotenv()
+
+# MongoDB setup
+mongo_uri = os.getenv("MONGODB_URI")
+if not mongo_uri:
+    raise ValueError("MONGODB_URI not set in environment variables")
+mongo_client = MongoClient(mongo_uri)
+db = mongo_client["vedic-agent"]
+feedback_collection = db["feedback"]
 
 def fine_tune_model(positive_pairs, negative_pairs, model_name="all-MiniLM-L6-v2",
                     output_path="../output/fine_tuned_model"):
@@ -26,7 +41,7 @@ def fine_tune_model(positive_pairs, negative_pairs, model_name="all-MiniLM-L6-v2
         train_examples.append(InputExample(texts=[row["query"], verse_text], label=0.0))
 
     if not train_examples:
-        print("No training examples available for fine-tuning.")
+        print("No training examples available for finetuning.")
         return
 
     # Define the training dataset and dataloader
@@ -44,7 +59,17 @@ def fine_tune_model(positive_pairs, negative_pairs, model_name="all-MiniLM-L6-v2
     )
     print(f"Model fine-tuned and saved to {output_path}")
 
+    # Delete feedback from MongoDB after finetuning
+    try:
+        feedback_collection.delete_many({})  # Deletes all feedback records
+        print("Feedback records deleted from MongoDB after finetuning.")
+    except Exception as e:
+        print(f"Error deleting feedback from MongoDB: {e}")
+    finally:
+        mongo_client.close()
 
-# Run fine-tuning
-positive_pairs, negative_pairs = load_feedback()
-fine_tune_model(positive_pairs, negative_pairs)
+# Run finetuning
+if __name__ == "__main__":
+    positive_pairs, negative_pairs = load_feedback()
+    if positive_pairs is not None and negative_pairs is not None:
+        fine_tune_model(positive_pairs, negative_pairs)
