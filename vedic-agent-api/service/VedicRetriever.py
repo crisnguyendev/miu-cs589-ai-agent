@@ -74,7 +74,8 @@ class VedicRetriever:
                     results.append({
                         "verse": verse["text"],
                         "source": verse["source"],
-                        "score": float(score)
+                        "score": float(score),
+                        "verse_id": verse["verse_id"]
                     })
                 else:
                     logger.warning(f"Invalid index {idx} returned by FAISS")
