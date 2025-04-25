@@ -1,24 +1,12 @@
 import pandas as pd
-from pathlib import Path
-from pymongo import MongoClient
-from dotenv import load_dotenv
-import os
 
-# Load environment variables
-load_dotenv()
+from finetuning.mongo_utils import mongo_connection
 
-# MongoDB setup
-mongo_uri = os.getenv("MONGODB_URI")
-if not mongo_uri:
-    raise ValueError("MONGODB_URI not set in environment variables")
-mongo_client = MongoClient(mongo_uri)
-db = mongo_client["vedic-agent"]
-feedback_collection = db["feedback"]
 
 def load_feedback(max_entries=100):
     try:
         # Fetch the most recent feedback from MongoDB, limited to max_entries
-        feedback_records = list(feedback_collection.find().sort("timestamp", -1).limit(max_entries))
+        feedback_records = list(mongo_connection.feedback_collection.find().sort("timestamp", -1).limit(max_entries))
         if not feedback_records:
             print("No feedback data found in MongoDB.")
             return None, None
@@ -36,8 +24,6 @@ def load_feedback(max_entries=100):
     except Exception as e:
         print(f"Error loading feedback from MongoDB: {e}")
         return None, None
-    finally:
-        mongo_client.close()
 
 # Example usage
 if __name__ == "__main__":

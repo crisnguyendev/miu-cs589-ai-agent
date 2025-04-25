@@ -1,12 +1,15 @@
+import sys
+import os
+
+from finetuning.mongo_utils import mongo_connection
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from fastapi import FastAPI, HTTPException
 import pandas as pd
-from pathlib import Path
 import logging
-import os
 import warnings
 from openai import OpenAI
-from dotenv import load_dotenv
-from pymongo import MongoClient
 from datetime import datetime
 
 from typing import List, Dict
@@ -17,23 +20,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from finetuning.updateEmbeddingsAndIndex import update_embeddings_and_index
 from service.VedicRetriever import VedicRetriever
 from service.models import FeedbackRequest, RetrievalResponse
-from finetuning.loadFeedback import load_feedback  # Import for finetuning
-from finetuning.fineTuneModel import fine_tune_model  # Import for finetuning
+from finetuning.loadFeedback import load_feedback
+from finetuning.fineTuneModel import fine_tune_model
 
 warnings.filterwarnings("ignore", category=UserWarning, module="urllib3")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
-
-# Loading Environment variables
-load_dotenv()
-
-# MongoDB setup
-mongo_uri = os.getenv("MONGODB_URI")
-if not mongo_uri:
-    raise ValueError("MONGODB_URI not set in environment variables")
-mongo_client = MongoClient(mongo_uri)
-db = mongo_client["vedic-agent"]
-feedback_collection = db["feedback"]
 
 app = FastAPI(title="VedicSage Retrieval API",
               description="Retrieve relevant Vedic verses based on semantic similarity")
@@ -47,24 +39,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-def find_file(base_path: str, filename: str) -> str:
-    search_dirs = [
-        base_path,
-        os.path.join(base_path, "output"),
-        os.path.join(base_path, "../output"),
-        os.path.join(base_path, "data"),
-        os.path.dirname(os.path.abspath(__file__)),
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), "../output"),
-    ]
-    logger.debug(f"Searching for {filename} in: {search_dirs}")
-    for dir_path in search_dirs:
-        file_path = os.path.join(dir_path, filename)
-        if Path(file_path).exists():
-            logger.info(f"Found {filename} at: {file_path}")
-            return file_path
-    raise FileNotFoundError(f"File '{filename}' not found in common directories: {search_dirs}")
-
-# Global retriever instance (will be updated after finetuning)
+# Global retriever instance (will be updated after fine-tuning)
 retriever = VedicRetriever(
     index_path="../output/verse_index.faiss",
     metadata_path="../output/verses_metadata.csv",
@@ -77,7 +52,7 @@ async def lifespan(app: FastAPI):
     logger.info(f"Working directory: {os.getcwd()}")
     yield
     logger.info("VedicSage Retrieval API shutting down")
-    mongo_client.close()
+    mongo_connection.close()  # Close MongoDB connection on shutdown
 
 app.lifespan = lifespan
 
@@ -156,8 +131,8 @@ async def submit_feedback(feedback: FeedbackRequest):
             "timestamp": datetime.utcnow()
         }
 
-        # Insert feedback into MongoDB
-        feedback_collection.insert_one(feedback_data)
+        # Insert feedback into MongoDB using the new connection utility
+        mongo_connection.feedback_collection.insert_one(feedback_data)
         logger.info(f"Feedback recorded for query: {feedback.query}")
         logger.info(f"Feedback data: {feedback_data}")
         return {"message": "Feedback recorded successfully"}
@@ -166,32 +141,27 @@ async def submit_feedback(feedback: FeedbackRequest):
         raise HTTPException(status_code=500, detail="Failed to record feedback")
 
 ### FINE-TUNE ENDPOINT
-@app.get("/fine-tune")
+@app.post("/fine-tune")
 async def fine_tune():
-    global retriever  # To update the global retriever instance
+    global retriever
     try:
-        # Step 1: Load feedback from MongoDB
         positive_pairs, negative_pairs = load_feedback()
         if positive_pairs is None or negative_pairs is None or (len(positive_pairs) == 0 and len(negative_pairs) == 0):
-            raise HTTPException(status_code=400, detail="No feedback data available for finetuning")
+            raise HTTPException(status_code=400, detail="No feedback data available for fine-tuning")
 
-        # Step 2: Fine-tune the model
         fine_tune_model(positive_pairs, negative_pairs, model_name="all-MiniLM-L6-v2", output_path="../output/fine_tuned_model")
-
-        # Step 3: Update embeddings and FAISS index
-        update_embeddings_and_index(model_path="../output/fine_tuned_model", output_path="../output/verse_index.faiss")
-
-        # Step 4: Reload the VedicRetriever with the updated model and index
+        update_embeddings_and_index(model_path="../output/fine_tuned_model", output_index_path="../output/verse_index.faiss")
         retriever = VedicRetriever(
             index_path="../output/verse_index.faiss",
             metadata_path="../output/verses_metadata.csv",
             model_path="../output/fine_tuned_model"
         )
         logger.info("VedicRetriever reloaded with fine-tuned model and updated index")
-
         return {"message": "Model fine-tuned, embeddings updated, and retriever reloaded successfully"}
     except Exception as e:
-        logger.error(f"Error during finetuning: {e}")
+        import traceback
+        traceback.print_exc()
+        logger.error(f"Error during fine-tuning: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to fine-tune model: {str(e)}")
 
 # For testing API
@@ -201,7 +171,6 @@ async def root():
 
 if __name__ == "__main__":
     import uvicorn
-    import os
 
     logger.info(f"Working directory: {os.getcwd()}")
 
