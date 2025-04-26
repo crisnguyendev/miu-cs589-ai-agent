@@ -13,3 +13,4 @@ python-dotenv==1.0.1
 httpx==0.27.2  # Explicitly add httpx for compatibility
 pymongo==4.8.0
 certifi==2024.8.30
+

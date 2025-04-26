@@ -3,12 +3,12 @@ import os
 import shutil
 import tempfile
 import time
+from fastapi import FastAPI, HTTPException, BackgroundTasks  # Added BackgroundTasks
 
 from finetuning.mongo_utils import mongo_connection
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from fastapi import FastAPI, HTTPException
 import pandas as pd
 import logging
 import warnings
@@ -153,59 +153,45 @@ async def submit_feedback(feedback: FeedbackRequest):
         logger.info("Inserting feedback into MongoDB")
         mongo_connection.feedback_collection.insert_one(feedback_data)
         logger.info(f"Feedback recorded for query: {feedback.query}")
-        logger.debug(f"Feedback data: {feedback_data}")  # Use debug level for detailed data
+        logger.debug(f"Feedback data: {feedback_data}")
         return {"message": "Feedback recorded successfully"}
     except Exception as e:
         logger.error(f"Error recording feedback: {e}")
         raise HTTPException(status_code=500, detail="Failed to record feedback")
 
 ### FINE-TUNE ENDPOINT
-@app.post("/fine-tune")
-async def fine_tune():
+async def run_fine_tuning(positive_pairs, negative_pairs, temp_dir: str):
+    """Run the fine-tuning process in the background."""
     global retriever
     try:
-        logger.info("Starting fine-tuning process")
-        positive_pairs, negative_pairs = load_feedback()
-        logger.info(f"Loaded feedback: {len(positive_pairs)} positive pairs, {len(negative_pairs)} negative pairs")
-        if positive_pairs is None or negative_pairs is None or (len(positive_pairs) == 0 and len(negative_pairs) == 0):
-            logger.warning("No feedback data available for fine-tuning")
-            raise HTTPException(status_code=400, detail="No feedback data available for fine-tuning")
+        logger.info("Calling fine_tune_model to fine-tune the model")
+        fine_tune_model(positive_pairs, negative_pairs, model_name="all-MiniLM-L6-v2", output_path=temp_dir)
+        logger.info("fine_tune_model completed successfully")
 
-        # Unload the current model to release any file locks
-        logger.info("Unloading current SentenceTransformer model to release file locks")
-        retriever.unload_model()
+        # Ensure the output directory exists
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+            logger.info(f"Created output directory: {output_dir}")
 
-        # Create a temporary directory to save the fine-tuned model
-        with tempfile.TemporaryDirectory(dir=output_dir) as temp_dir:
-            logger.info(f"Using temporary directory for fine-tuning: {temp_dir}")
-            logger.info("Calling fine_tune_model to fine-tune the model")
-            fine_tune_model(positive_pairs, negative_pairs, model_name="all-MiniLM-L6-v2", output_path=temp_dir)
-            logger.info("fine_tune_model completed successfully")
-
-            # Ensure the output directory exists
-            if not os.path.exists(output_dir):
-                os.makedirs(output_dir)
-                logger.info(f"Created output directory: {output_dir}")
-
-            # Retry deleting the existing model directory with a delay
-            if os.path.exists(model_path):
-                max_attempts = 3
-                for attempt in range(max_attempts):
-                    try:
-                        logger.info(f"Attempt {attempt + 1} to remove existing model directory: {model_path}")
-                        shutil.rmtree(model_path)
-                        logger.info("Existing model directory removed successfully")
-                        break
-                    except Exception as e:
-                        logger.warning(f"Failed to remove model directory on attempt {attempt + 1}: {e}")
-                        if attempt < max_attempts - 1:
-                            time.sleep(1)  # Wait 1 second before retrying
-                        else:
-                            logger.error(f"Failed to remove model directory after {max_attempts} attempts: {e}")
-                            raise Exception(f"Failed to remove model directory after {max_attempts} attempts: {e}")
-            logger.info(f"Moving fine-tuned model from {temp_dir} to {model_path}")
-            shutil.move(temp_dir, model_path)
-            logger.info("Fine-tuned model moved successfully")
+        # Retry deleting the existing model directory with a delay
+        if os.path.exists(model_path):
+            max_attempts = 3
+            for attempt in range(max_attempts):
+                try:
+                    logger.info(f"Attempt {attempt + 1} to remove existing model directory: {model_path}")
+                    shutil.rmtree(model_path)
+                    logger.info("Existing model directory removed successfully")
+                    break
+                except Exception as e:
+                    logger.warning(f"Failed to remove model directory on attempt {attempt + 1}: {e}")
+                    if attempt < max_attempts - 1:
+                        time.sleep(1)  # Wait 1 second before retrying
+                    else:
+                        logger.error(f"Failed to remove model directory after {max_attempts} attempts: {e}")
+                        raise Exception(f"Failed to remove model directory after {max_attempts} attempts: {e}")
+        logger.info(f"Moving fine-tuned model from {temp_dir} to {model_path}")
+        shutil.move(temp_dir, model_path)
+        logger.info("Fine-tuned model moved successfully")
 
         # Update embeddings and index with the new model
         logger.info("Updating embeddings and FAISS index with the new model")
@@ -220,12 +206,37 @@ async def fine_tune():
             model_path=model_path
         )
         logger.info("VedicRetriever reloaded with fine-tuned model and updated index")
-        return {"message": "Model fine-tuned, embeddings updated, and retriever reloaded successfully"}
+    except Exception as e:
+        logger.error(f"Error during background fine-tuning: {e}")
+
+@app.post("/fine-tune")
+async def fine_tune(background_tasks: BackgroundTasks):  # Added BackgroundTasks parameter
+    global retriever
+    try:
+        logger.info("Starting fine-tuning process")
+        positive_pairs, negative_pairs = load_feedback()
+        logger.info(f"Loaded feedback: {len(positive_pairs)} positive pairs, {len(negative_pairs)} negative pairs")
+        if positive_pairs is None or negative_pairs is None or (len(positive_pairs) == 0 and len(negative_pairs) == 0):
+            logger.warning("No feedback data available for fine-tuning")
+            raise HTTPException(status_code=400, detail="No feedback data available for fine-tuning")
+
+        # Unload the current model to release any file locks
+        logger.info("Unloading current SentenceTransformer model to release file locks")
+        retriever.unload_model()
+
+        # Create a temporary directory to save the fine-tuned model
+        temp_dir = tempfile.mkdtemp(dir=output_dir)  # Create a temp directory that persists for the background task
+        logger.info(f"Using temporary directory for fine-tuning: {temp_dir}")
+
+        # Schedule the fine-tuning process in the background
+        background_tasks.add_task(run_fine_tuning, positive_pairs, negative_pairs, temp_dir)
+
+        return {"message": "Fine-tuning process started in the background. Check logs for progress."}
     except Exception as e:
         import traceback
         traceback.print_exc()
-        logger.error(f"Error during fine-tuning: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to fine-tune model: {str(e)}")
+        logger.error(f"Error initiating fine-tuning: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to initiate fine-tuning: {str(e)}")
 
 # For testing API
 @app.get("/")
