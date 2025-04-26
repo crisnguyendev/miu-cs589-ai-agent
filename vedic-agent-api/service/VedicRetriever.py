@@ -34,7 +34,8 @@ class VedicRetriever:
                 raise ValueError(f"Metadata missing required columns")
             logger.info(f"Loaded {len(self.df)} verses from {metadata_path}")
 
-        # LOAD MODEL for embedding
+            # LOAD MODEL for embedding
+            self.model_path = model_path  # Store model_path for logging in unload_model
             if Path(model_path).exists():
                 logger.info(f"Loading finetuned Model from: {model_path}")
                 self.model = SentenceTransformer(model_path)  # Load fine-tuned model
@@ -47,8 +48,19 @@ class VedicRetriever:
             logger.error(f"Error initializing retriever: {e}")
             raise
 
+    def unload_model(self):
+        """Unload the SentenceTransformer model to release any file locks."""
+        if self.model is not None:
+            logger.info(f"Unloading SentenceTransformer model from {self.model_path}")
+            self.model = None  # Set to None to allow garbage collection
+            import gc
+            gc.collect()  # Force garbage collection to release resources
+
     def retrieve(self, query: str, k: int = 5) -> List[Dict]:
         try:
+            if self.model is None:
+                raise RuntimeError("Model is not loaded. Please reinitialize VedicRetriever.")
+
             query_emb = self.model.encode([query]).astype(np.float32)
             distances, indices = self.index.search(query_emb, k)
             results = []
